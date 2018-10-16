@@ -87,7 +87,22 @@ class WordCloud3d extends PureComponent {
        
         console.log(gl.getProgramInfoLog(program));
         gl.deleteProgram(program);
-      }
+    }
+    //WebGL的主要任务就是设置好状态并为GLSL着色程序提供数据
+    bindPosition(gl,program,positions){
+        let positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+        // 重新调整画布
+        gl.viewport(0,0,gl.canvas.width,gl.canvas.height)
+        // 调整好以后背景渲染
+        this.clearColor(gl)
+        // 并启动program
+        gl.useProgram(program)
+
+        return positionBuffer
+    }
     drawRect(gl){
 
     }
@@ -97,6 +112,7 @@ class WordCloud3d extends PureComponent {
         gl.clearDepth(5) //清空景深
         gl.clear(gl.DEPTH_BUFFER_BIT)
     }
+
     componentDidMount(){
         let gl = getWebGLContext(this.el);
         // validate whether client web has the context of webgl 
@@ -110,7 +126,37 @@ class WordCloud3d extends PureComponent {
 
         let program = this.createProgram(gl,vshader,pshader);
         
-        this.clearColor(gl)
+        
+        let positionAttributeLocation = gl.getAttribLocation(program,"a_position")
+        let positions = [
+            0, 0,
+            0, 0.5,
+            0.7, 0,
+        ];
+        let positionBuffer = this.bindPosition(gl,program,positions)
+
+        gl.enableVertexAttribArray(positionAttributeLocation);
+
+        // 将绑定点绑定到缓冲数据（positionBuffer）
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        // 告诉属性怎么从positionBuffer中读取数据 (ARRAY_BUFFER)
+        var size = 2;          // 每次迭代运行提取两个单位数据
+        var type = gl.FLOAT;   // 每个单位的数据类型是32位浮点型
+        var normalize = false; // 不需要归一化数据
+        var stride = 0;        // 0 = 移动单位数量 * 每个单位占用内存（sizeof(type)）
+                            // 每次迭代运行运动多少内存到下一个数据开始点
+        var offset = 0;        // 从缓冲起始位置开始读取
+        gl.vertexAttribPointer(
+            positionAttributeLocation, size, type, normalize, stride, offset)
+    
+        var primitiveType = gl.TRIANGLES;
+        var offset = 0;
+        var count = 3;
+        gl.drawArrays(primitiveType, offset, count);
+        
+        // this.clearColor(gl)
+
+        
 
         // this.state.timer = setTimeout()
         // requestAnimationFrame()
