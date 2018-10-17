@@ -11,12 +11,26 @@ class WordCloud3d extends PureComponent {
         this.state={
             timer:null,
         }
+        this.textCtx = document.createElement("canvas").getContext("2d");
         this.gl = null //webgl对象
         this.el = null //canvas对象
     }
+    makeTextCanvas(text, width, height) {
+        let textCtx = this.textCtx
+        textCtx.canvas.width  = width;
+        textCtx.canvas.height = height;
+        textCtx.font = "20px monospace";
+        textCtx.textAlign = "center";
+        textCtx.textBaseline = "middle";
+        textCtx.fillStyle = "blue";
+        textCtx.clearRect(0, 0, textCtx.canvas.width, textCtx.canvas.height);
+        textCtx.fillText(text, width / 2, height / 2);
+        return textCtx.canvas;
+    }
+
     end(words,tags, bounds) { 
         console.log(words,tags, bounds); 
-    } 
+    }
     onMoveCanvas=(e)=>{
         let {clientX,clientY} = e
         let {width,height} = this.el.style;
@@ -30,7 +44,9 @@ class WordCloud3d extends PureComponent {
             0.0,0.0,1.0,0.0,
             1.0,1.0,0.0,1.0
         ])
-        this.drawTriangle(this.gl,this.positionAttributeLocation,this.resolutionUniformLocation,this.trans_positionUniformLocation,tformMatrix)
+        console.log("2",clientX,clientY);
+        console.log("1",this.gl.canvas.clientX,this.gl.canvas.clientX);
+        this.drawTriangle(this.gl,this.positionAttributeLocation,this.resolutionUniformLocation,this.trans_positionUniformLocation,tformMatrix,this.ucolorUniformLocation)
     }
     usrd3Cloud=()=>{
         var words = ["Hello", "world", "normally", "you", "want", "more", "words", "than", "this"]
@@ -91,8 +107,9 @@ class WordCloud3d extends PureComponent {
         "#ifdef GL_ES",
         "precision mediump float;",
         "#endif",
+        "uniform vec4 u_color;",
         "void main() {",
-        "    gl_FragColor = vec4(0.5, 0.5, 0.5, 1);",
+        "    gl_FragColor = u_color;",
         "}"
         ].join("\n")
         return source
@@ -140,7 +157,7 @@ class WordCloud3d extends PureComponent {
        
        
     }
-    drawTriangle(gl,positionAttributeLocation,resolutionUniformLocation,trans_positionUniformLocation,tformMatrix){
+    drawTriangle(gl,positionAttributeLocation,resolutionUniformLocation,trans_positionUniformLocation,tformMatrix,ucolorUniformLocation){
         
         let size = 2;          // 每次迭代运行提取两个单位数据
         let type = gl.FLOAT;   // 每个单位的数据类型是32位浮点型
@@ -150,9 +167,10 @@ class WordCloud3d extends PureComponent {
         let offset = 0;        // 从缓冲起始位置开始读取
         // 将缓冲区的数据attribue
         gl.vertexAttribPointer(
-            positionAttributeLocation, size, type, normalize, stride, offset)
+            positionAttributeLocation, size, type, normalize, new Float32Array(this.positions).BYTES_PER_ELEMENT * 2, offset)
         // 设置 u_resolution 的值为最大
         gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
+        gl.uniform4f(ucolorUniformLocation,0.5, 0.5, 0.5, 1)
         gl.uniformMatrix4fv(trans_positionUniformLocation,false,tformMatrix)
         let primitiveType = gl.TRIANGLES;//TRIANGLES
         let count = 6;
@@ -164,7 +182,7 @@ class WordCloud3d extends PureComponent {
         gl.drawArrays(primitiveType, offset, count);        
     }
     clearColor(gl){
-        gl.clearColor(0.3,0.4,0.5,0.5) // 清空颜色
+        gl.clearColor(0.3,0.4,0.5,1) // 清空颜色
         gl.clear(gl.COLOR_BUFFER_BIT)
         // gl.clearDepth(5) //清空景深
         // gl.clear(gl.DEPTH_BUFFER_BIT)
@@ -183,7 +201,10 @@ class WordCloud3d extends PureComponent {
         this.positionAttributeLocation = gl.getAttribLocation(program,"a_position")
         this.resolutionUniformLocation = gl.getUniformLocation(program , "u_resolution")
         this.trans_positionUniformLocation = gl.getUniformLocation(program , "u_trans_postion")
+        this.ucolorUniformLocation = gl.getUniformLocation(program , "u_color")
 
+
+        // vec4(0.5, 0.5, 0.5, 1)
         let positions = [
             10, 20,
             80, 20,
@@ -192,6 +213,7 @@ class WordCloud3d extends PureComponent {
             80, 20,
             80, 30,
         ];
+        this.positions = positions
         let tformMatrix = new Float32Array([
             1.0,0.0,0.0,0.0,
             0.0,1.0,0.0,0.0,
@@ -199,7 +221,7 @@ class WordCloud3d extends PureComponent {
             0.0,0.0,0.0,1.0
         ])
         this.bindPositionAndOpenTwoShader(gl,positions)
-        this.drawTriangle(gl,this.positionAttributeLocation,this.resolutionUniformLocation,this.trans_positionUniformLocation,tformMatrix)
+        this.drawTriangle(gl,this.positionAttributeLocation,this.resolutionUniformLocation,this.trans_positionUniformLocation,tformMatrix,this.ucolorUniformLocation)
         // this.usrd3Cloud()
     }
     render() {

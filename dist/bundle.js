@@ -125,6 +125,23 @@ var WordCloud3d = function (_PureComponent) {
 
         var _this = _possibleConstructorReturn(this, (WordCloud3d.__proto__ || Object.getPrototypeOf(WordCloud3d)).call(this, props));
 
+        _this.onMoveCanvas = function (e) {
+            var clientX = e.clientX,
+                clientY = e.clientY;
+            var _this$el$style = _this.el.style,
+                width = _this$el$style.width,
+                height = _this$el$style.height;
+
+            width = parseInt(width);
+            height = parseInt(height);
+
+            _this.clearColor(_this.gl);
+            var tformMatrix = new Float32Array([1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0]);
+            console.log("2", clientX, clientY);
+            console.log("1", _this.gl.canvas.clientX, _this.gl.canvas.clientX);
+            _this.drawTriangle(_this.gl, _this.positionAttributeLocation, _this.resolutionUniformLocation, _this.trans_positionUniformLocation, tformMatrix, _this.ucolorUniformLocation);
+        };
+
         _this.usrd3Cloud = function () {
             var words = ["Hello", "world", "normally", "you", "want", "more", "words", "than", "this"].map(function (d) {
                 return { text: d, size: 10 + Math.random() * 90 };
@@ -144,6 +161,8 @@ var WordCloud3d = function (_PureComponent) {
         _this.state = {
             timer: null
         };
+        _this.gl = null; //webgl对象
+        _this.el = null; //canvas对象
         return _this;
     }
 
@@ -161,12 +180,25 @@ var WordCloud3d = function (_PureComponent) {
             }
             return true;
         }
+        // 初始化program 返回program
+
+    }, {
+        key: "initProgram",
+        value: function initProgram(gl) {
+            var vsource = this.createVsource();
+            var psource = this.createPsource();
+            var vshader = this.createShader(gl, gl.VERTEX_SHADER, vsource);
+            var pshader = this.createShader(gl, gl.FRAGMENT_SHADER, psource);
+            var program = this.createProgram(gl, vshader, pshader);
+            return program;
+        }
         // 创建顶点着色源
 
     }, {
         key: "createVsource",
         value: function createVsource() {
-            var source = ["attribute vec4 a_position;", "void main() {", "    gl_Position = a_position;", "}"].join("\n");
+            var source = ["attribute vec2 a_position;", "uniform vec2 u_resolution;", "uniform mat4 u_trans_postion;", "void main() {", "    vec2 zeroToOne = a_position / u_resolution;", "    vec2 zeroToTwo = zeroToOne * 2.0;", "    vec2 clipSpace = zeroToTwo - 1.0;", "    gl_Position = u_trans_postion * vec4(clipSpace  , 0 , 1);", "    gl_PointSize = 0.1;", "}"].join("\n");
+            // gl_Position 是一个齐次坐标 (x,y,z, 1==顶点,0表示向量，法向量等等)
             return source;
         }
         // 创建片元着色源
@@ -174,7 +206,7 @@ var WordCloud3d = function (_PureComponent) {
     }, {
         key: "createPsource",
         value: function createPsource() {
-            var source = ["precision mediump float;", "void main() {", "    gl_FragColor = vec4(1, 0, 0.5, 1);", "}"].join("\n");
+            var source = ["#ifdef GL_ES", "precision mediump float;", "#endif", "uniform vec4 u_color;", "void main() {", "    gl_FragColor = u_color;", "}"].join("\n");
             return source;
         }
         // 创建着色器
@@ -189,7 +221,7 @@ var WordCloud3d = function (_PureComponent) {
             if (success) {
                 return shader;
             }
-            console.log(gl.getShaderInfoLog(shader));
+            // console.log(gl.getShaderInfoLog(shader));
             gl.deleteShader(shader);
         }
         // 创建一个program
@@ -198,90 +230,94 @@ var WordCloud3d = function (_PureComponent) {
         key: "createProgram",
         value: function createProgram(gl, vertexShader, fragmentShader) {
             var program = gl.createProgram();
+
             gl.attachShader(program, vertexShader);
             gl.attachShader(program, fragmentShader);
             gl.linkProgram(program);
             var success = gl.getProgramParameter(program, gl.LINK_STATUS);
             if (success) {
+                // 开始启动 program
+                gl.useProgram(program);
                 return program;
             }
 
-            console.log(gl.getProgramInfoLog(program));
+            // console.log(gl.getProgramInfoLog(program));
             gl.deleteProgram(program);
         }
         //WebGL的主要任务就是设置好状态并为GLSL着色程序提供数据
+        //创建缓冲区，用来给所有变量使用，并
 
     }, {
-        key: "bindPosition",
-        value: function bindPosition(gl, program, positions) {
+        key: "bindPositionAndOpenTwoShader",
+        value: function bindPositionAndOpenTwoShader(gl, positions) {
             var positionBuffer = gl.createBuffer();
+            // 将数据绑定到缓冲区的对象上，并作为标记为array_buffer（number值）
             gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+            // 写入数据的GPU的缓冲中
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW); // 这里
 
             // 重新调整画布
             gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-            // 调整好以后背景渲染
-            this.clearColor(gl);
-            // 并启动program
-            gl.useProgram(program);
-
-            return positionBuffer;
         }
     }, {
-        key: "drawRect",
-        value: function drawRect(gl) {}
-    }, {
-        key: "clearColor",
-        value: function clearColor(gl) {
-            gl.clearColor(0.3, 0.4, 0.5, 0.8); // 清空颜色
-            gl.clear(gl.COLOR_BUFFER_BIT);
-            gl.clearDepth(5); //清空景深
-            gl.clear(gl.DEPTH_BUFFER_BIT);
-        }
-    }, {
-        key: "componentDidMount",
-        value: function componentDidMount() {
-            var gl = (0, _cuonUtils.getWebGLContext)(this.el);
-            // validate whether client web has the context of webgl 
-            if (!this.validateWebgl(gl)) {
-                return undefined;
-            }
-            // this.usrd3Cloud()
+        key: "drawTriangle",
+        value: function drawTriangle(gl, positionAttributeLocation, resolutionUniformLocation, trans_positionUniformLocation, tformMatrix, ucolorUniformLocation) {
 
-            var vsource = this.createVsource();
-            var psource = this.createPsource();
-            var vshader = this.createShader(gl, gl.VERTEX_SHADER, vsource);
-            var pshader = this.createShader(gl, gl.FRAGMENT_SHADER, psource);
-
-            var program = this.createProgram(gl, vshader, pshader);
-
-            var positionAttributeLocation = gl.getAttribLocation(program, "a_position");
-            var positions = [0, 0, 0, 0.5, 0.7, 0];
-            var positionBuffer = this.bindPosition(gl, program, positions);
-
-            gl.enableVertexAttribArray(positionAttributeLocation);
-
-            // 将绑定点绑定到缓冲数据（positionBuffer）
-            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-            // 告诉属性怎么从positionBuffer中读取数据 (ARRAY_BUFFER)
             var size = 2; // 每次迭代运行提取两个单位数据
             var type = gl.FLOAT; // 每个单位的数据类型是32位浮点型
             var normalize = false; // 不需要归一化数据
             var stride = 0; // 0 = 移动单位数量 * 每个单位占用内存（sizeof(type)）
             // 每次迭代运行运动多少内存到下一个数据开始点
             var offset = 0; // 从缓冲起始位置开始读取
-            gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
+            // 将缓冲区的数据attribue
+            gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, new Float32Array(this.positions).BYTES_PER_ELEMENT * 2, offset);
+            // 设置 u_resolution 的值为最大
+            gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
+            gl.uniform4f(ucolorUniformLocation, 0.5, 0.5, 0.5, 1);
+            gl.uniformMatrix4fv(trans_positionUniformLocation, false, tformMatrix);
+            var primitiveType = gl.TRIANGLES; //TRIANGLES
+            var count = 6;
 
-            var primitiveType = gl.TRIANGLES;
-            var offset = 0;
-            var count = 3;
+            // 调整好以后背景渲染
+            this.clearColor(gl);
+            // 开启attribute变量，用来在物理渲染阶段进行填充,
+            gl.enableVertexAttribArray(positionAttributeLocation);
             gl.drawArrays(primitiveType, offset, count);
+        }
+    }, {
+        key: "clearColor",
+        value: function clearColor(gl) {
+            gl.clearColor(0.3, 0.4, 0.5, 1); // 清空颜色
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            // gl.clearDepth(5) //清空景深
+            // gl.clear(gl.DEPTH_BUFFER_BIT)
+        }
+    }, {
+        key: "componentDidMount",
+        value: function componentDidMount() {
 
-            // this.clearColor(gl)
+            var gl = (0, _cuonUtils.getWebGLContext)(this.el);
+            // 设置gl可访问
+            this.gl = gl;
+            // validate whether client web has the context of webgl 
+            if (!this.validateWebgl(gl)) {
+                return undefined;
+            }
+            // 
+            var program = this.initProgram(gl);
 
+            this.positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+            this.resolutionUniformLocation = gl.getUniformLocation(program, "u_resolution");
+            this.trans_positionUniformLocation = gl.getUniformLocation(program, "u_trans_postion");
+            this.ucolorUniformLocation = gl.getUniformLocation(program, "u_color");
 
-            // this.state.timer = setTimeout()
-            // requestAnimationFrame()
+            // vec4(0.5, 0.5, 0.5, 1)
+            var positions = [10, 20, 80, 20, 10, 30, 10, 30, 80, 20, 80, 30];
+            this.positions = positions;
+            var tformMatrix = new Float32Array([1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]);
+            this.bindPositionAndOpenTwoShader(gl, positions);
+            this.drawTriangle(gl, this.positionAttributeLocation, this.resolutionUniformLocation, this.trans_positionUniformLocation, tformMatrix, this.ucolorUniformLocation);
+            // this.usrd3Cloud()
         }
     }, {
         key: "render",
@@ -296,8 +332,12 @@ var WordCloud3d = function (_PureComponent) {
 
             var cw = void 0,
                 ch = void 0;
+            style = {
+                width: "500px",
+                height: "500px"
+            };
             style && (cw = style.width) && (ch = style.height);
-            return _react2.default.createElement("canvas", { ref: function ref(el) {
+            return _react2.default.createElement("canvas", { onMouseMove: this.onMoveCanvas, ref: function ref(el) {
                     return _this2.el = el;
                 }, style: _extends({}, canvasstyle, style) });
         }
