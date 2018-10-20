@@ -11,22 +11,12 @@ class WordCloud3d extends PureComponent {
         this.state={
             timer:null,
         }
-        this.textCtx = document.createElement("canvas").getContext("2d");
+        this.textCtx = document.createElement("canvas").getContext("2d");// 创建一个图,用来作为文字的贴图(纹理)
+        
         this.gl = null //webgl对象
         this.el = null //canvas对象
     }
-    makeTextCanvas(text, width, height) {
-        let textCtx = this.textCtx
-        textCtx.canvas.width  = width;
-        textCtx.canvas.height = height;
-        textCtx.font = "20px monospace";
-        textCtx.textAlign = "center";
-        textCtx.textBaseline = "middle";
-        textCtx.fillStyle = "blue";
-        textCtx.clearRect(0, 0, textCtx.canvas.width, textCtx.canvas.height);
-        textCtx.fillText(text, width / 2, height / 2);
-        return textCtx.canvas;
-    }
+
 
     end(words,tags, bounds) { 
         console.log(words,tags, bounds); 
@@ -187,9 +177,7 @@ class WordCloud3d extends PureComponent {
         // gl.clearDepth(5) //清空景深
         // gl.clear(gl.DEPTH_BUFFER_BIT)
     }
-
-    componentDidMount(){
-        
+    drawTriangleMain(){
         let gl = getWebGLContext(this.el);
         // 设置gl可访问
         this.gl = gl
@@ -223,6 +211,13 @@ class WordCloud3d extends PureComponent {
         this.bindPositionAndOpenTwoShader(gl,positions)
         this.drawTriangle(gl,this.positionAttributeLocation,this.resolutionUniformLocation,this.trans_positionUniformLocation,tformMatrix,this.ucolorUniformLocation)
         // this.usrd3Cloud()
+    }
+    drawTextWord(){
+        let gl = getWebGLContext(this.el);
+    }
+    componentDidMount(){
+    
+     
     }
     render() {
         let canvasstyle = {
